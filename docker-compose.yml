@@ -1,0 +1,14 @@
+services:
+  mongodb:
+    image: mongo:8
+    restart: unless-stopped
+    ports:
+      - '${MONGO_PORT:-27017}:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-cinema}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-cinema}
+    volumes:
+      - cinema-mongo-data:/data/db
+
+volumes:
+  cinema-mongo-data:
