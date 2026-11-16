@@ -7,6 +7,7 @@ import {
   IsString,
   ValidateIf,
 } from 'class-validator';
+import { Trim } from '../../common/trim';
 import { MAX_INTEGER } from '../../common/limits';
 
 // Поле можна не передавати, але передане значення (зокрема null) має пройти перевірку:
@@ -16,6 +17,7 @@ const isProvided = (_: unknown, value: unknown) => value !== undefined;
 export class UpdateFilmDto {
   @ApiPropertyOptional({ example: 'Дюна', description: 'Назва фільму' })
   @ValidateIf(isProvided)
+  @Trim()
   @IsString()
   @IsNotEmpty()
   title?: string;

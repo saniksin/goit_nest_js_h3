@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, IsNotEmpty, IsPositive, IsString, Max } from 'class-validator';
+import { Trim } from '../../common/trim';
 import { MAX_HALL_ROWS, MAX_SEATS_PER_ROW } from '../../common/limits';
 
 export class CreateHallDto {
@@ -7,6 +8,7 @@ export class CreateHallDto {
     example: 'Зал 1',
     description: 'Назва залу, унікальна серед усіх залів',
   })
+  @Trim()
   @IsString()
   @IsNotEmpty()
   name: string;

@@ -1,12 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
-import { validationPipeOptions } from './../src/validation';
-import { HttpExceptionFilter } from './../src/common/filters/http-exception.filter';
+import { INestApplication } from '@nestjs/common';
+import { configureApp } from './../src/app.setup';
 import { Film } from './../src/films/schemas/film.schema';
 import { Hall } from './../src/halls/schemas/hall.schema';
 import {
@@ -19,7 +17,7 @@ const missingId = '665fffffffffffffffffffff';
 const invalidId = 'not-an-object-id';
 
 describe('Cinema API (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: INestApplication;
   let connection: Connection;
   let filmModel: Model<Film>;
   let showingModel: Model<Showing>;
@@ -31,8 +29,7 @@ describe('Cinema API (e2e)', () => {
       imports: [AppModule],
     }).compile();
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe(validationPipeOptions));
-    app.useGlobalFilters(new HttpExceptionFilter());
+    configureApp(app);
     await app.init();
     connection = app.get(getConnectionToken());
     showingModel = app.get(getModelToken(Showing.name));
@@ -203,6 +200,12 @@ describe('Cinema API (e2e)', () => {
         .send({ releaseYear: 'давно' })
         .expect(400);
       await http.patch(`/films/${film.id}`).send({ title: null }).expect(400);
+      // Назва з самих пробілів — 400, а не помилка валідації схеми
+      await http.patch(`/films/${film.id}`).send({ title: '   ' }).expect(400);
+      await http
+        .post('/films')
+        .send({ title: '  ', durationMinutes: 90, releaseYear: 2000 })
+        .expect(400);
       await http.get(`/films/${film.id}`).expect(200, film);
     });
 
@@ -265,7 +268,16 @@ describe('Cinema API (e2e)', () => {
         .post('/halls')
         .send({ name: 'A', rows: 3, seatsPerRow: 101 })
         .expect(400);
+      await http
+        .post('/halls')
+        .send({ name: '   ', rows: 3, seatsPerRow: 5 })
+        .expect(400);
       await createHall('A');
+      // Назва обрізається до перевірки унікальності
+      await http
+        .post('/halls')
+        .send({ name: '  A  ', rows: 1, seatsPerRow: 1 })
+        .expect(409);
       await http
         .post('/halls')
         .send({ name: 'A', rows: 1, seatsPerRow: 1 })
@@ -439,6 +451,13 @@ describe('Cinema API (e2e)', () => {
       expect(ids(second.body.items)).toEqual([night.id]);
     });
 
+    it('startsAt без зсуву читається в часовому поясі кінотеатру', async () => {
+      const film = await createFilm();
+      const hall = await createHall();
+      const showing = await createShowing(film.id, hall.id, '2099-05-01T18:30');
+      expect(showing.startsAt).toBe('2099-05-01T15:30:00.000Z');
+    });
+
     it('400 на невалідні page, limit, date і sort', async () => {
       for (const query of [
         'page=0',
@@ -544,6 +563,9 @@ describe('Cinema API (e2e)', () => {
         ],
         [{ row: 4, seat: 1 }],
         [{ row: 1, seat: 6 }],
+        'x',
+        // Більше за межу місць в одному бронюванні
+        Array.from({ length: 101 }, (_, i) => ({ row: 1, seat: i + 1 })),
       ];
       for (const seats of invalid) {
         await book(seats).expect(400);
@@ -577,6 +599,37 @@ describe('Cinema API (e2e)', () => {
       expect(statuses).toEqual([201, 409, 409, 409, 409]);
       expect(await countBookings()).toBe(1);
       expect(await countBookedSeats()).toBe(1);
+    });
+
+    it('бронює 100 місць у найбільшому залі 100 × 100 одним запитом', async () => {
+      const film = await createFilm('Великий');
+      const hall = await createHall('Великий зал', 100, 100);
+      const big = await createShowing(film.id, hall.id);
+      const seats = Array.from({ length: 100 }, (_, i) => ({
+        row: 100,
+        seat: i + 1,
+      }));
+      const res = await http
+        .post(`/showings/${big.id}/bookings`)
+        .send({ seats })
+        .expect(201);
+      expect(res.body.totalPrice).toBe(12500 * 100);
+      const after = await http.get(`/showings/${big.id}/seats`).expect(200);
+      expect(after.body).toHaveLength(10_000);
+      expect(
+        after.body.filter((s: { isBooked: boolean }) => s.isBooked),
+      ).toHaveLength(100);
+    });
+
+    it('одночасні бронювання різних місць проходять усі', async () => {
+      const results = await Promise.all(
+        [1, 2, 3, 4, 5].map((seat) => book([{ row: 2, seat }])),
+      );
+      expect(results.map((res) => res.status)).toEqual([
+        201, 201, 201, 201, 201,
+      ]);
+      expect(await countBookings()).toBe(5);
+      expect(await countBookedSeats()).toBe(5);
     });
 
     it('одночасні бронювання, що перетинаються одним місцем: проходить лише одне', async () => {

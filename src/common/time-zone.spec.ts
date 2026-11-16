@@ -1,4 +1,4 @@
-import { dayRange } from './time-zone';
+import { dayRange, parseDateTime } from './time-zone';
 
 describe('dayRange', () => {
   it('рахує межі доби в часовому поясі кінотеатру', () => {
@@ -27,5 +27,31 @@ describe('dayRange', () => {
       from: new Date('2030-12-31T00:00:00Z'),
       to: new Date('2031-01-01T00:00:00Z'),
     });
+  });
+
+  it('коректно обробляє роки до 100', () => {
+    expect(dayRange('0099-05-01', 'UTC').from.toISOString()).toBe(
+      '0099-05-01T00:00:00.000Z',
+    );
+  });
+});
+
+describe('parseDateTime', () => {
+  it('рядок зі зсувом читає як є', () => {
+    expect(parseDateTime('2099-05-01T18:30:00+03:00', 'UTC')).toEqual(
+      new Date('2099-05-01T15:30:00Z'),
+    );
+    expect(parseDateTime('2099-05-01T18:30:00Z', 'Europe/Kyiv')).toEqual(
+      new Date('2099-05-01T18:30:00Z'),
+    );
+  });
+
+  it('рядок без зсуву читає в часовому поясі кінотеатру, а не сервера', () => {
+    expect(parseDateTime('2099-05-01T18:30', 'Europe/Kyiv')).toEqual(
+      new Date('2099-05-01T15:30:00Z'),
+    );
+    expect(parseDateTime('2099-01-15T18:30:15.5', 'Europe/Kyiv')).toEqual(
+      new Date('2099-01-15T16:30:15.500Z'),
+    );
   });
 });

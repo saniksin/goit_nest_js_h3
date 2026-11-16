@@ -19,7 +19,7 @@ import { ShowingSeat } from './schemas/showing-seat.schema';
 import { FilmsService } from '../films/films.service';
 import { HallsService } from '../halls/halls.service';
 import { EnvironmentVariables } from '../config/environment-variables';
-import { dayRange } from '../common/time-zone';
+import { dayRange, parseDateTime } from '../common/time-zone';
 
 // Поля сеансу для відповідей: масиви seats і bookings не вибираються з бази взагалі
 const VIEW_FIELDS = 'film hall startsAt price';
@@ -49,7 +49,10 @@ export class ShowingsService {
     if (hall === null) {
       throw new BadRequestException(`Зал з id ${hallId} не знайдено`);
     }
-    const start = new Date(startsAt);
+    const start = parseDateTime(
+      startsAt,
+      this.configService.get('CINEMA_TIMEZONE', { infer: true }),
+    );
     if (start.getTime() <= Date.now()) {
       throw new BadRequestException('startsAt вказує на момент у минулому');
     }

@@ -45,7 +45,7 @@ export class BookingsController {
   })
   @ApiBadRequestResponse({
     description:
-      'seats порожній, елемент без row і seat, місце повторюється, місця немає в залі або число не є цілим додатним',
+      'seats порожній або містить понад 100 місць, елемент без row і seat, місце повторюється, місця немає в залі або число не є цілим додатним',
   })
   @ApiNotFoundResponse({ description: 'Сеанс не знайдено' })
   @ApiConflictResponse({

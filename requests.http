@@ -274,8 +274,14 @@ GET {{host}}/showings
 ### Сеанси фільму за добу 2099-05-01, сторінка 1 по 1 запису, від пізніших до ранніших. Очікується: 200
 GET {{host}}/showings?filmId={{createFilm.response.body.$.id}}&date=2099-05-01&page=1&limit=1&sort=desc
 
-### Помилка: page не є цілим числом від 1. Очікується: 400
+### Помилка: page менше 1. Очікується: 400
 GET {{host}}/showings?page=0
+
+### Помилка: page не є цілим числом. Очікується: 400
+GET {{host}}/showings?page=1.5
+
+### Помилка: limit не є цілим числом. Очікується: 400
+GET {{host}}/showings?limit=abc
 
 ### Помилка: limit виходить за межі 1–100. Очікується: 400
 GET {{host}}/showings?limit=101
